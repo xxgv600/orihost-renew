@@ -22,7 +22,14 @@ ORIHOST_REMEMBER = (
     or os.environ.get('COOKIE_VALUE')
     or ""
 ).strip()
-ORIHOST_SERVER_IDS = os.environ.get('ORIHOST_SERVER_IDS') or ""  # 单服：短ID 或 完整 UUID
+ORIHOST_SERVER_IDS = os.environ.get('ORIHOST_SERVER_IDS') or ""  # 单服：短ID 或 完整 UUID，多个时取第一个
+_RAW_SERVER_ID = ORIHOST_SERVER_IDS.strip()
+if "/server/" in _RAW_SERVER_ID:
+    _RAW_SERVER_ID = _RAW_SERVER_ID.rstrip("/").split("/server/")[-1].strip()
+if "," in _RAW_SERVER_ID:
+    _RAW_SERVER_ID = _RAW_SERVER_ID.split(",")[0].strip()
+if " " in _RAW_SERVER_ID:
+    _RAW_SERVER_ID = _RAW_SERVER_ID.split()[0].strip()
 EMAIL = os.environ.get('EMAIL') or os.environ.get('ORIHOST_EMAIL') or ""  # 仅用于 TG 通知脱敏展示
 TG_BOT_TOKEN = os.environ.get('TG_BOT_TOKEN') or ""
 TG_CHAT_ID = os.environ.get('TG_CHAT_ID') or ""
@@ -33,8 +40,19 @@ if not (TG_BOT_TOKEN and TG_CHAT_ID) and ',' in _TG_BOT:
     TG_CHAT_ID, TG_BOT_TOKEN = _a.strip(), _b.strip()
 
 BASE_URL = "https://panel.orihost.com"
-SERVER_SHORT_ID = "8651e616"  # 地址栏 /server/ 后面那段
-SERVER_UUID = "8651e616-52e2-46bb-8cbf-74159abb9815"  # 抓包实测：API 要用全量 UUID
+# FIX 2026-10-27：原来 ORIHOST_SERVER_IDS 读了却从没被用过，下面两行一直写死 8651e616，
+# 所以 secret 填 2b49e419 也无效，脚本永远去 8651e616 那台。现在改为由环境变量驱动：
+# 填完整 UUID 时，短 ID 取 UUID 第一段；只填短 ID 时，API 的 UUID 暂用短 ID（cooldown 可能 404，
+# UI 流程仍可继续，cooldown 为 None 时不跳过），并在 main() 里打印出来以便核对。
+if _RAW_SERVER_ID and "-" in _RAW_SERVER_ID and len(_RAW_SERVER_ID) >= 36:
+    SERVER_UUID = _RAW_SERVER_ID
+    SERVER_SHORT_ID = _RAW_SERVER_ID.split("-")[0]
+elif _RAW_SERVER_ID:
+    SERVER_SHORT_ID = _RAW_SERVER_ID
+    SERVER_UUID = _RAW_SERVER_ID
+else:
+    SERVER_SHORT_ID = "8651e616"  # 地址栏 /server/ 后面那段（未填 secret 时的旧默认值）
+    SERVER_UUID = "8651e616-52e2-46bb-8cbf-74159abb9815"  # 抓包实测：API 要用全量 UUID
 SERVER_URL = f"{BASE_URL}/server/{SERVER_SHORT_ID}"
 API_COOLDOWN = f"{BASE_URL}/api/client/servers/{SERVER_UUID}/renew/cooldown"
 API_BEGIN = f"{BASE_URL}/api/client/servers/{SERVER_UUID}/renew/begin"
@@ -650,6 +668,10 @@ def main():
 
             current_ip = get_current_ip(PROXY_SERVER)
             log(f"🎯 当前出口IP: {current_ip}")
+            log(f"🎯 目标服务器: short={SERVER_SHORT_ID} url={SERVER_URL}")
+            if "-" not in SERVER_UUID or len(SERVER_UUID) < 36:
+                log("⚠️ 只给了短 ID，未给完整 UUID：cooldown 接口可能返回 404，UI 续期流程仍可继续；"
+                    "如需准确的 cooldown，请把该服的完整 UUID 填入 ORIHOST_SERVER_IDS")
 
             log("🚀 启动浏览器...")
             browser = p.chromium.launch(
