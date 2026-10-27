@@ -51,7 +51,7 @@ elif _RAW_SERVER_ID:
     SERVER_SHORT_ID = _RAW_SERVER_ID
     SERVER_UUID = _RAW_SERVER_ID
 else:
-    SERVER_SHORT_ID = "8651e616"  # 地址栏 /server/ 后面那段（未填 secret 时的旧默认值）
+    SERVER_SHORT_ID = "2b49e419"  # 地址栏 /server/ 后面那段（未填 secret 时的旧默认值）
     SERVER_UUID = "8651e616-52e2-46bb-8cbf-74159abb9815"  # 抓包实测：API 要用全量 UUID
 SERVER_URL = f"{BASE_URL}/server/{SERVER_SHORT_ID}"
 API_COOLDOWN = f"{BASE_URL}/api/client/servers/{SERVER_UUID}/renew/cooldown"
